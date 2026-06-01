@@ -14,12 +14,12 @@ class Settings(BaseSettings):
     
     # LLM Selection
     LLM_PROVIDER: str = "groq"  # groq | openai
-    LLM_MODEL: str = "llama3-8b-8192"
+    LLM_MODEL: str = "llama-3.1-8b-instant"
     
     # Transcription Settings
-    WHISPER_MODE: str = "local"  # local | api
+    WHISPER_MODE: str = "api"  # local | api
     WHISPER_LOCAL_MODEL: str = "base"  # tiny | base | small | medium
-    WHISPER_API_PROVIDER: str = "openai"  # openai | groq
+    WHISPER_API_PROVIDER: str = "groq"  # openai | groq
     
     # Disk Storage Directories
     DOWNLOADS_DIR: str = "./downloads"
