@@ -1,0 +1,83 @@
+import os
+import yt_dlp
+import logging
+
+logger = logging.getLogger(__name__)
+
+class DownloadError(Exception):
+    """Custom exception raised when yt-dlp downloading fails."""
+    pass
+
+def download_youtube_audio(youtube_url: str, output_dir: str, podcast_id: str) -> str:
+    """
+    Downloads the audio stream from a YouTube URL using yt-dlp, 
+    converts it to a lightweight 16kHz mono MP3, and saves it.
+    
+    Args:
+        youtube_url (str): The public YouTube link.
+        output_dir (str): Folder where the audio will be saved.
+        podcast_id (str): Unique identifier for the podcast.
+        
+    Returns:
+        str: Absolute file path to the downloaded MP3.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    output_template = os.path.join(output_dir, f"{podcast_id}.%(ext)s")
+    final_output_path = os.path.join(output_dir, f"{podcast_id}.mp3")
+
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': output_template,
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '128',
+        }],
+        # Resample to 16000Hz and mono for optimal speech recognition
+        'postprocessor_args': [
+            '-ar', '16000',
+            '-ac', '1'
+        ],
+        'quiet': True,
+        'no_warnings': True,
+        'nocheckcertificate': True,
+    }
+
+    logger.info(f"Initiating yt-dlp audio extraction for: {youtube_url}")
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # First extract metadata to verify accessibility
+            info = ydl.extract_info(youtube_url, download=True)
+            
+            # Check duration limits if any (e.g. 2 hours = 7200 seconds)
+            duration = info.get('duration', 0)
+            if duration > 7200:
+                raise DownloadError("The video duration exceeds our maximum limit of 2 hours.")
+                
+            title = info.get('title', 'Unknown Podcast')
+            logger.info(f"Successfully downloaded audio: '{title}' ({duration}s)")
+            
+            # Since postprocessors run and output to final_output_path
+            if os.path.exists(final_output_path):
+                return final_output_path
+            else:
+                # In some configurations, the output path might have slightly different casing or naming
+                potential_path = os.path.join(output_dir, f"{podcast_id}.mp3")
+                if os.path.exists(potential_path):
+                    return potential_path
+                raise DownloadError("Audio file was downloaded but post-processing failed to write final MP3.")
+                
+    except yt_dlp.utils.DownloadError as de:
+        error_msg = str(de)
+        logger.error(f"yt-dlp download failed: {error_msg}")
+        if "private" in error_msg.lower():
+            raise DownloadError("This YouTube video is private or unavailable.")
+        elif "sign in" in error_msg.lower():
+            raise DownloadError("This video requires sign-in (age-restricted or private).")
+        elif "country" in error_msg.lower() or "geo" in error_msg.lower():
+            raise DownloadError("This video is geoblocked/region-locked.")
+        else:
+            raise DownloadError(f"Failed to fetch YouTube media: {error_msg.split(';')[0]}")
+    except Exception as e:
+        logger.error(f"Unexpected download error: {str(e)}")
+        raise DownloadError(f"Ingestion pipeline failed during audio download: {str(e)}")
