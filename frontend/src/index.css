@@ -1,12 +1,36 @@
+@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
-/* Global styles */
+/* Configure custom brand variables natively in Tailwind CSS v4 */
+@theme {
+  --color-theme-bg-primary: #0F0F0F;
+  --color-theme-bg-secondary: #161616;
+  --color-theme-bg-tertiary: #1E1E1E;
+
+  --color-theme-border-muted: #222222;
+  --color-theme-border-active: #2E2E2E;
+
+  --color-theme-accent-purple: #6C63FF;
+  --color-theme-accent-purple-glow: rgba(108, 99, 255, 0.15);
+
+  --color-theme-text-primary: #F5F5F5;
+  --color-theme-text-secondary: #888888;
+  --color-theme-text-disabled: #555555;
+
+  --color-theme-success: #22C55E;
+  --color-theme-error: #EF4444;
+  --color-theme-warning: #F59E0B;
+
+  --font-sans: 'Inter', sans-serif;
+
+  --shadow-glow: 0 0 15px rgba(108, 99, 255, 0.25);
+  --shadow-glow-strong: 0 0 25px rgba(108, 99, 255, 0.4);
+}
+
+/* Global body overrides */
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: #0F0F0F;
   color: #F5F5F5;
   -webkit-font-smoothing: antialiased;
@@ -14,7 +38,7 @@ body {
   overflow-x: hidden;
 }
 
-/* Custom premium scrollbars for our split layouts */
+/* Premium Scrollbars for Timeline & Workspace Views */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -33,7 +57,7 @@ body {
   background: #6C63FF;
 }
 
-/* Micro-animations and custom effects */
+/* Custom visual utilities */
 .glass-panel {
   background: rgba(22, 22, 22, 0.7);
   backdrop-filter: blur(12px);
@@ -57,7 +81,7 @@ body {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Spinner rotation keyframe */
+/* Spinner rotation */
 @keyframes spin {
   from {
     transform: rotate(0deg);
@@ -68,10 +92,10 @@ body {
 }
 
 .animate-spin-custom {
-  animation: spin 1s linear infinite;
+  animation: spin 1.8s linear infinite;
 }
 
-/* Custom gradient styles */
+/* Text and Hero Radial Gradients */
 .text-gradient {
   background: linear-gradient(135deg, #F5F5F5 30%, #888888 100%);
   -webkit-background-clip: text;
