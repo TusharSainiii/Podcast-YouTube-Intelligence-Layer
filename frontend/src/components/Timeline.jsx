@@ -15,7 +15,7 @@ export default function Timeline({ segments, activeSegmentIdx, onSegmentClick })
   }, [activeSegmentIdx]);
 
   const formatTime = (seconds) => {
-    const mins = int = Math.floor(seconds / 60);
+    const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
