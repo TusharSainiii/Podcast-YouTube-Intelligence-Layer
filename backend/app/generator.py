@@ -25,28 +25,69 @@ def generate_podcast_analytics(segments: List[Dict[str, Any]]) -> Dict[str, Any]
         raise GenerationError("No transcription segments available to summarize.")
         
     try:
-        # 1. Prepare condensed transcript with timestamps for context
-        transcript_blocks = []
-        for seg in segments:
-            start = float(seg.get("start", 0.0))
-            mins = int((start % 3600) // 60)
-            secs = int(start % 60)
-            timestamp = f"{mins:02d}:{secs:02d}"
+        # 1. Determine maximum character limit based on the provider
+        # Groq has a very low Free Tier rate limit of 6,000 Tokens Per Minute (TPM).
+        # To avoid rate_limit_exceeded (especially with Devanagari/Hindi text which tokenizes to many tokens),
+        # we restrict the prompt transcript context to 9,000 characters.
+        if settings.LLM_PROVIDER == "groq":
+            max_chars = 9000
+        else:
+            max_chars = 60000
+
+        # Calculate total characters of all segments
+        total_chars = sum(len(str(seg.get("text", ""))) for seg in segments)
+
+        if total_chars <= max_chars:
+            # Full transcript fits within limits
+            transcript_blocks = []
+            for seg in segments:
+                start = float(seg.get("start", 0.0))
+                mins = int((start % 3600) // 60)
+                secs = int(start % 60)
+                timestamp = f"{mins:02d}:{secs:02d}"
+                transcript_blocks.append(f"[{timestamp}] {seg.get('text', '')}")
+            full_transcript_str = "\n".join(transcript_blocks)
+        else:
+            # We downsample by selecting contiguous blocks of segments at regular intervals
+            # to cover the entire podcast timeline while staying under max_chars.
+            logger.info(f"Transcript total size ({total_chars} chars) exceeds max_chars ({max_chars}). Downsampling to cover full timeline...")
             
-            transcript_blocks.append(f"[{timestamp}] {seg.get('text', '')}")
+            import math
+            block_size = 3  # consecutive segments per block (keeps local context coherent)
+            blocks = []
+            for i in range(0, len(segments), block_size):
+                blocks.append(segments[i:i+block_size])
             
-        full_transcript_str = "\n".join(transcript_blocks)
-        
-        # If the transcript is extremely long, limit it to avoid exceeding LLM context limits
-        # Slicing to ~15,000 words keeps it safe for standard model contexts (approx 60,000 chars)
-        if len(full_transcript_str) > 70000:
-            logger.warning("Transcript is extremely long, truncating middle segments to fit LLM window.")
-            full_transcript_str = (
-                full_transcript_str[:35000] + 
-                "\n\n... [TRUNCATED FOR CONTEXT LIMITS] ...\n\n" + 
-                full_transcript_str[-35000:]
-            )
+            total_blocks = len(blocks)
+            avg_chars_per_block = total_chars / total_blocks if total_blocks > 0 else 1
+            max_selected_blocks = max_chars / avg_chars_per_block
             
+            step = math.ceil(total_blocks / max_selected_blocks) if max_selected_blocks > 0 else 1
+            step = max(1, step)
+            
+            selected_blocks = []
+            for idx in range(0, total_blocks, step):
+                selected_blocks.append(blocks[idx])
+                
+            # Compile selected blocks into full_transcript_str
+            transcript_blocks = []
+            for block in selected_blocks:
+                # Add a separator between non-contiguous blocks to indicate time jump
+                if transcript_blocks:
+                    transcript_blocks.append("... [TIME JUMP] ...")
+                for seg in block:
+                    start = float(seg.get("start", 0.0))
+                    mins = int((start % 3600) // 60)
+                    secs = int(start % 60)
+                    timestamp = f"{mins:02d}:{secs:02d}"
+                    transcript_blocks.append(f"[{timestamp}] {seg.get('text', '')}")
+                    
+            full_transcript_str = "\n".join(transcript_blocks)
+            
+            # Final sanity safety truncate just in case
+            if len(full_transcript_str) > max_chars + 1000:
+                full_transcript_str = full_transcript_str[:max_chars] + "\n\n... [TRUNCATED] ..."
+
         # 2. Get LLM client
         llm = get_llm_model()
         
