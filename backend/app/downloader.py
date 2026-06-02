@@ -49,10 +49,10 @@ def download_youtube_audio(youtube_url: str, output_dir: str, podcast_id: str) -
             # First extract metadata to verify accessibility
             info = ydl.extract_info(youtube_url, download=True)
             
-            # Check duration limits if any (e.g. 2 hours = 7200 seconds)
+            # Check duration limits if any (e.g. 8 hours = 28800 seconds)
             duration = info.get('duration', 0)
-            if duration > 7200:
-                raise DownloadError("The video duration exceeds our maximum limit of 2 hours.")
+            if duration > 28800:
+                raise DownloadError("The video duration exceeds our maximum limit of 8 hours.")
                 
             title = info.get('title', 'Unknown Podcast')
             logger.info(f"Successfully downloaded audio: '{title}' ({duration}s)")

@@ -1,5 +1,7 @@
 import os
 import logging
+import glob
+import subprocess
 from typing import List, Dict, Any
 from app.config import settings
 
@@ -100,43 +102,131 @@ def _transcribe_via_api(audio_path: str) -> List[Dict[str, Any]]:
         raise TranscriptionError("OpenAI python client package is missing. Add 'openai' to requirements.txt.")
         
     try:
-        logger.info(f"Dispatching API audio transcription request via {provider}...")
-        client = OpenAI(api_key=api_key, base_url=base_url)
+        file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+        logger.info(f"Audio file size is: {file_size_mb:.2f} MB")
         
-        with open(audio_path, "rb") as audio_file:
-            # We request verbose_json response format to get detailed word/segment timestamps
-            transcript_response = client.audio.transcriptions.create(
-                file=audio_file,
-                model=model_name,
-                response_format="verbose_json"
-            )
+        # If the file size is larger than 24MB, split it to comply with Groq/OpenAI 25MB limit
+        if file_size_mb > 24.0:
+            logger.info("File size exceeds 24MB. Splitting into 10-minute chunks...")
+            dirname = os.path.dirname(audio_path)
+            basename = os.path.splitext(os.path.basename(audio_path))[0]
+            chunk_pattern = os.path.join(dirname, f"{basename}_chunk_%03d.mp3")
             
-        # Parse standard OpenAI verbose_json segments
-        segments = []
-        # API returns data in transcript_response.segments
-        response_dict = transcript_response.model_dump() if hasattr(transcript_response, "model_dump") else transcript_response
-        raw_segments = response_dict.get("segments", [])
-        
-        if not raw_segments:
-            # Fallback if segments list is empty but text is present
-            text = response_dict.get("text", "")
-            if text:
-                segments.append({
-                    "start": 0.0,
-                    "end": 60.0,  # Arbitrary timing fallback
-                    "text": text.strip()
-                })
-        else:
-            for seg in raw_segments:
-                segments.append({
-                    "start": float(seg.get("start", 0.0)),
-                    "end": float(seg.get("end", 0.0)),
-                    "text": str(seg.get("text", "")).strip()
-                })
+            split_cmd = [
+                "ffmpeg", "-y", "-i", audio_path,
+                "-f", "segment",
+                "-segment_time", "600",
+                "-c", "copy",
+                chunk_pattern
+            ]
+            logger.info(f"Running ffmpeg split command: {' '.join(split_cmd)}")
+            subprocess.run(split_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            chunk_files = sorted(glob.glob(os.path.join(dirname, f"{basename}_chunk_*.mp3")))
+            logger.info(f"Generated {len(chunk_files)} chunk files for transcription.")
+            
+            if not chunk_files:
+                raise TranscriptionError("Failed to generate chunk files using ffmpeg segment command.")
                 
-        logger.info(f"API transcription complete. Generated {len(segments)} segments.")
-        return segments
-        
+            combined_segments = []
+            current_offset = 0.0
+            client = OpenAI(api_key=api_key, base_url=base_url)
+            
+            for i, chunk_path in enumerate(chunk_files):
+                logger.info(f"Transcribing chunk {i+1}/{len(chunk_files)}: {chunk_path} with offset {current_offset:.2f}s")
+                
+                # Get exact duration of this chunk
+                duration = 600.0
+                try:
+                    duration_cmd = [
+                        "ffprobe", "-v", "error", 
+                        "-show_entries", "format=duration", 
+                        "-of", "default=noprint_wrappers=1:nokey=1", 
+                        chunk_path
+                    ]
+                    res = subprocess.run(duration_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    duration = float(res.stdout.strip())
+                except Exception as e:
+                    logger.warning(f"Could not get exact duration for {chunk_path}: {e}. Using 600.0s fallback.")
+                
+                with open(chunk_path, "rb") as audio_file:
+                    transcript_response = client.audio.transcriptions.create(
+                        file=audio_file,
+                        model=model_name,
+                        response_format="verbose_json"
+                    )
+                
+                response_dict = transcript_response.model_dump() if hasattr(transcript_response, "model_dump") else transcript_response
+                raw_segments = response_dict.get("segments", [])
+                
+                if not raw_segments:
+                    text = response_dict.get("text", "")
+                    if text:
+                        combined_segments.append({
+                            "start": current_offset,
+                            "end": current_offset + duration,
+                            "text": text.strip()
+                        })
+                else:
+                    for seg in raw_segments:
+                        combined_segments.append({
+                            "start": current_offset + float(seg.get("start", 0.0)),
+                            "end": current_offset + float(seg.get("end", 0.0)),
+                            "text": str(seg.get("text", "")).strip()
+                        })
+                
+                try:
+                    os.remove(chunk_path)
+                except Exception as e:
+                    logger.warning(f"Failed to delete temporary chunk file {chunk_path}: {e}")
+                    
+                current_offset += duration
+                
+            logger.info(f"API transcription of all chunks complete. Generated {len(combined_segments)} total segments.")
+            return combined_segments
+            
+        else:
+            # Under 24MB, upload directly in one request
+            logger.info(f"Dispatching API audio transcription request via {provider}...")
+            client = OpenAI(api_key=api_key, base_url=base_url)
+            
+            with open(audio_path, "rb") as audio_file:
+                transcript_response = client.audio.transcriptions.create(
+                    file=audio_file,
+                    model=model_name,
+                    response_format="verbose_json"
+                )
+                
+            segments = []
+            response_dict = transcript_response.model_dump() if hasattr(transcript_response, "model_dump") else transcript_response
+            raw_segments = response_dict.get("segments", [])
+            
+            if not raw_segments:
+                text = response_dict.get("text", "")
+                if text:
+                    segments.append({
+                        "start": 0.0,
+                        "end": 60.0,
+                        "text": text.strip()
+                    })
+            else:
+                for seg in raw_segments:
+                    segments.append({
+                        "start": float(seg.get("start", 0.0)),
+                        "end": float(seg.get("end", 0.0)),
+                        "text": str(seg.get("text", "")).strip()
+                    })
+                    
+            logger.info(f"API transcription complete. Generated {len(segments)} segments.")
+            return segments
+            
     except Exception as e:
         logger.error(f"API transcription request failed: {str(e)}")
+        # Cleanup any remaining chunks on error
+        if 'basename' in locals() and 'dirname' in locals():
+            for f in glob.glob(os.path.join(dirname, f"{basename}_chunk_*.mp3")):
+                try:
+                    os.remove(f)
+                except:
+                    pass
         raise TranscriptionError(f"Cloud transcription API error: {str(e)}")
