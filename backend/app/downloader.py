@@ -45,6 +45,7 @@ def download_youtube_audio(youtube_url: str, output_dir: str, podcast_id: str) -
         'no_warnings': True,
         'nocheckcertificate': True,
         'js_runtimes': {'node': {}},  # Resolve JavaScript anti-bot challenges using local Node.js
+        'remote_components': {'ejs:github'},  # Enable fetching remote component solver for signatures
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
