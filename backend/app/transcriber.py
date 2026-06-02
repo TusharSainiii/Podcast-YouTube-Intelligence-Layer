@@ -2,6 +2,7 @@ import os
 import logging
 import glob
 import subprocess
+import time
 from typing import List, Dict, Any
 from app.config import settings
 
@@ -105,6 +106,9 @@ def _transcribe_via_api(audio_path: str) -> List[Dict[str, Any]]:
         file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
         logger.info(f"Audio file size is: {file_size_mb:.2f} MB")
         
+        # Configure client with a generous 3-minute timeout for network uploads
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=180.0)
+        
         # If the file size is larger than 24MB, split it to comply with Groq/OpenAI 25MB limit
         if file_size_mb > 24.0:
             logger.info("File size exceeds 24MB. Splitting into 10-minute chunks...")
@@ -130,7 +134,6 @@ def _transcribe_via_api(audio_path: str) -> List[Dict[str, Any]]:
                 
             combined_segments = []
             current_offset = 0.0
-            client = OpenAI(api_key=api_key, base_url=base_url)
             
             for i, chunk_path in enumerate(chunk_files):
                 logger.info(f"Transcribing chunk {i+1}/{len(chunk_files)}: {chunk_path} with offset {current_offset:.2f}s")
@@ -149,12 +152,25 @@ def _transcribe_via_api(audio_path: str) -> List[Dict[str, Any]]:
                 except Exception as e:
                     logger.warning(f"Could not get exact duration for {chunk_path}: {e}. Using 600.0s fallback.")
                 
-                with open(chunk_path, "rb") as audio_file:
-                    transcript_response = client.audio.transcriptions.create(
-                        file=audio_file,
-                        model=model_name,
-                        response_format="verbose_json"
-                    )
+                # Send to API with a retry mechanism for connection/network glitches
+                transcript_response = None
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        logger.info(f"Uploading chunk {i+1} (Attempt {attempt+1}/{max_retries})...")
+                        with open(chunk_path, "rb") as audio_file:
+                            transcript_response = client.audio.transcriptions.create(
+                                file=audio_file,
+                                model=model_name,
+                                response_format="verbose_json"
+                            )
+                        break  # Success!
+                    except Exception as api_err:
+                        if attempt == max_retries - 1:
+                            logger.error(f"Failed to transcribe chunk {i+1} after {max_retries} attempts: {api_err}")
+                            raise api_err
+                        logger.warning(f"Attempt {attempt+1} failed with error: {api_err}. Retrying in 3 seconds...")
+                        time.sleep(3)
                 
                 response_dict = transcript_response.model_dump() if hasattr(transcript_response, "model_dump") else transcript_response
                 raw_segments = response_dict.get("segments", [])
@@ -186,16 +202,25 @@ def _transcribe_via_api(audio_path: str) -> List[Dict[str, Any]]:
             return combined_segments
             
         else:
-            # Under 24MB, upload directly in one request
-            logger.info(f"Dispatching API audio transcription request via {provider}...")
-            client = OpenAI(api_key=api_key, base_url=base_url)
-            
-            with open(audio_path, "rb") as audio_file:
-                transcript_response = client.audio.transcriptions.create(
-                    file=audio_file,
-                    model=model_name,
-                    response_format="verbose_json"
-                )
+            # Under 24MB, upload directly in one request with a retry mechanism
+            transcript_response = None
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"Dispatching API audio transcription request via {provider} (Attempt {attempt+1}/{max_retries})...")
+                    with open(audio_path, "rb") as audio_file:
+                        transcript_response = client.audio.transcriptions.create(
+                            file=audio_file,
+                            model=model_name,
+                            response_format="verbose_json"
+                        )
+                    break  # Success!
+                except Exception as api_err:
+                    if attempt == max_retries - 1:
+                        logger.error(f"Failed direct API transcription after {max_retries} attempts: {api_err}")
+                        raise api_err
+                    logger.warning(f"Attempt {attempt+1} failed with error: {api_err}. Retrying in 3 seconds...")
+                    time.sleep(3)
                 
             segments = []
             response_dict = transcript_response.model_dump() if hasattr(transcript_response, "model_dump") else transcript_response
