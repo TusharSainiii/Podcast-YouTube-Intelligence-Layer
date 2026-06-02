@@ -41,32 +41,63 @@ def download_youtube_audio(youtube_url: str, output_dir: str, podcast_id: str) -
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Sec-Fetch-Mode': 'navigate',
+        }
     }
 
     logger.info(f"Initiating yt-dlp audio extraction for: {youtube_url}")
+    
+    # Try Chrome cookies first, then Edge, then fallback to no cookies
+    for browser in ['chrome', 'edge']:
+        try:
+            logger.info(f"Attempting to download using cookies from browser: {browser}...")
+            temp_opts = ydl_opts.copy()
+            temp_opts['cookiesfrombrowser'] = (browser,)
+            with yt_dlp.YoutubeDL(temp_opts) as ydl:
+                info = ydl.extract_info(youtube_url, download=True)
+                duration = info.get('duration', 0)
+                if duration > 28800:
+                    raise DownloadError("The video duration exceeds our maximum limit of 8 hours.")
+                title = info.get('title', 'Unknown Podcast')
+                logger.info(f"Successfully downloaded audio with {browser} cookies: '{title}' ({duration}s)")
+                
+                if os.path.exists(final_output_path):
+                    return final_output_path
+                else:
+                    potential_path = os.path.join(output_dir, f"{podcast_id}.mp3")
+                    if os.path.exists(potential_path):
+                        return potential_path
+                    raise DownloadError("Audio file was downloaded but post-processing failed to write final MP3.")
+        except Exception as e:
+            err_str = str(e).lower()
+            # If it's a duration limit error, raise it immediately instead of trying other options
+            if "exceeds our maximum limit" in err_str:
+                raise DownloadError(str(e))
+            logger.warning(f"Failed download using {browser} cookies: {e}. Trying next option...")
+            continue
+
+    # Final fallback: Run without cookies
     try:
+        logger.info("Falling back to downloading without cookies...")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # First extract metadata to verify accessibility
             info = ydl.extract_info(youtube_url, download=True)
-            
-            # Check duration limits if any (e.g. 8 hours = 28800 seconds)
             duration = info.get('duration', 0)
             if duration > 28800:
                 raise DownloadError("The video duration exceeds our maximum limit of 8 hours.")
-                
             title = info.get('title', 'Unknown Podcast')
-            logger.info(f"Successfully downloaded audio: '{title}' ({duration}s)")
+            logger.info(f"Successfully downloaded audio without cookies: '{title}' ({duration}s)")
             
-            # Since postprocessors run and output to final_output_path
             if os.path.exists(final_output_path):
                 return final_output_path
             else:
-                # In some configurations, the output path might have slightly different casing or naming
                 potential_path = os.path.join(output_dir, f"{podcast_id}.mp3")
                 if os.path.exists(potential_path):
                     return potential_path
                 raise DownloadError("Audio file was downloaded but post-processing failed to write final MP3.")
-                
     except yt_dlp.utils.DownloadError as de:
         error_msg = str(de)
         logger.error(f"yt-dlp download failed: {error_msg}")
