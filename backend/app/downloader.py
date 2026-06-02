@@ -58,10 +58,13 @@ def download_youtube_audio(youtube_url: str, output_dir: str, podcast_id: str) -
     
     # 1. Try manual cookies.txt file first (most reliable on Windows to bypass locked browser file)
     if os.path.exists(cookies_path):
-        logger.info(f"Found manual cookies.txt at: {cookies_path}. Using it for download.")
-        temp_opts = ydl_opts.copy()
-        temp_opts['cookiefile'] = cookies_path
+        import shutil
+        logger.info(f"Found manual cookies.txt at: {cookies_path}. Creating temporary copy for download.")
+        temp_cookies_path = cookies_path + f".{podcast_id}.tmp"
         try:
+            shutil.copy2(cookies_path, temp_cookies_path)
+            temp_opts = ydl_opts.copy()
+            temp_opts['cookiefile'] = temp_cookies_path
             with yt_dlp.YoutubeDL(temp_opts) as ydl:
                 info = ydl.extract_info(youtube_url, download=True)
                 duration = info.get('duration', 0)
@@ -82,6 +85,12 @@ def download_youtube_audio(youtube_url: str, output_dir: str, podcast_id: str) -
             if "exceeds our maximum limit" in err_str:
                 raise DownloadError(str(e))
             logger.warning(f"Failed download using manual cookies.txt: {e}. Trying browser cookies fallback...")
+        finally:
+            if os.path.exists(temp_cookies_path):
+                try:
+                    os.remove(temp_cookies_path)
+                except Exception as del_err:
+                    logger.warning(f"Failed to delete temp cookies file: {del_err}")
 
     # 2. Try Chrome/Edge cookies fallback (might fail if Chrome is open due to Windows file lock)
     for browser in ['chrome', 'edge']:
