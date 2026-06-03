@@ -4,7 +4,7 @@ pydantic==2.6.4
 pydantic-settings==2.2.1
 python-dotenv==1.0.1
 yt-dlp==2024.3.10
-openai-whisper
+faster-whisper
 langchain>=0.3.0
 langchain-community>=0.3.0
 langchain-openai>=0.2.0

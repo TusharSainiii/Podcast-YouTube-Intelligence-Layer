@@ -37,34 +37,35 @@ def transcribe_audio(audio_path: str) -> List[Dict[str, Any]]:
         raise TranscriptionError(f"Invalid WHISPER_MODE configured: '{settings.WHISPER_MODE}'")
 
 def _transcribe_locally(audio_path: str) -> List[Dict[str, Any]]:
-    """Runs speech-to-text locally using the openai-whisper library."""
+    """Runs speech-to-text locally using the faster-whisper library."""
     global _local_whisper_model
     
-    logger.info("Initializing local Whisper transcription...")
+    logger.info("Initializing local faster-whisper transcription...")
     try:
-        import whisper
+        from faster_whisper import WhisperModel
     except ImportError:
         raise TranscriptionError(
-            "Local whisper package is not installed. Add 'openai-whisper' to requirements.txt."
+            "faster-whisper package is not installed. Add 'faster-whisper' to requirements.txt."
         )
         
     try:
         # Lazy load model and cache it
         if _local_whisper_model is None:
             model_size = settings.WHISPER_LOCAL_MODEL
-            logger.info(f"Loading local Whisper model: '{model_size}' (this may take a moment on first run)...")
-            _local_whisper_model = whisper.load_model(model_size)
-            logger.info("Whisper model loaded successfully.")
+            logger.info(f"Loading local faster-whisper model: '{model_size}' (this may take a moment on first run)...")
+            # CTranslate2 runs 4x faster on CPU with compute_type="int8"
+            _local_whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8")
+            logger.info("faster-whisper model loaded successfully.")
             
-        logger.info(f"Transcribing '{audio_path}' locally...")
-        result = _local_whisper_model.transcribe(audio_path, verbose=False)
+        logger.info(f"Transcribing '{audio_path}' locally using faster-whisper...")
+        segments_generator, info = _local_whisper_model.transcribe(audio_path, beam_size=5)
         
         segments = []
-        for seg in result.get("segments", []):
+        for seg in segments_generator:
             segments.append({
-                "start": float(seg.get("start", 0.0)),
-                "end": float(seg.get("end", 0.0)),
-                "text": str(seg.get("text", "")).strip()
+                "start": float(seg.start),
+                "end": float(seg.end),
+                "text": str(seg.text).strip()
             })
             
         logger.info(f"Local transcription complete. Generated {len(segments)} segments.")

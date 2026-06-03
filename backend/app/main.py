@@ -2,6 +2,7 @@ import os
 import uuid
 import json
 import logging
+import asyncio
 from datetime import datetime
 from typing import Optional
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Query, UploadFile, File, Form
@@ -100,10 +101,10 @@ def load_job_state(job_id: str) -> Optional[dict]:
     return None
 
 # --- ASYNCHRONOUS BACKGROUND PIPELINE WORKER ---
-def run_ingestion_pipeline(job_id: str, youtube_url: str, custom_title: Optional[str]):
+async def run_ingestion_pipeline(job_id: str, youtube_url: str, custom_title: Optional[str]):
     """
-    Executes the ingestion pipeline sequentially:
-    Download -> Transcribe -> Index -> Generate summaries -> Done
+    Executes the ingestion pipeline concurrently:
+    Download -> Transcribe -> (Index & Generate in parallel) -> Done
     """
     job = load_job_state(job_id)
     if not job:
@@ -117,13 +118,15 @@ def run_ingestion_pipeline(job_id: str, youtube_url: str, custom_title: Optional
         job["status"] = "downloading"
         save_job_state(job_id, job)
         
-        audio_path = download_youtube_audio(
+        audio_path = await asyncio.to_thread(
+            download_youtube_audio,
             youtube_url=youtube_url, 
             output_dir=settings.DOWNLOADS_DIR, 
             podcast_id=job_id
         )
         
         # Approximate duration check or title assignment
+        job = load_job_state(job_id) or job
         job["title"] = custom_title or f"Podcast Segment ({job_id[:8]})"
         save_job_state(job_id, job)
 
@@ -132,37 +135,53 @@ def run_ingestion_pipeline(job_id: str, youtube_url: str, custom_title: Optional
         job["status"] = "transcribing"
         save_job_state(job_id, job)
         
-        segments = transcribe_audio(audio_path)
+        segments = await asyncio.to_thread(transcribe_audio, audio_path)
+        job = load_job_state(job_id) or job
         job["segments"] = segments
         save_job_state(job_id, job)
 
-        # 3. INDEXING
-        logger.info(f"[{job_id}] Entering INDEXING phase.")
+        # 3 & 4. INDEXING AND GENERATING (Parallel)
+        logger.info(f"[{job_id}] Initiating parallel INDEXING and GENERATING phases.")
+        job = load_job_state(job_id) or job
         job["status"] = "indexing"
         save_job_state(job_id, job)
-        
-        build_and_save_vector_index(segments, job_id)
 
-        # 4. GENERATING
-        logger.info(f"[{job_id}] Entering GENERATING phase.")
-        job["status"] = "generating"
-        save_job_state(job_id, job)
-        
-        content = generate_podcast_analytics(segments)
-        job["content"] = content
+        async def run_indexing_task():
+            logger.info(f"[{job_id}] Started parallel FAISS indexing task...")
+            await asyncio.to_thread(build_and_save_vector_index, segments, job_id)
+            logger.info(f"[{job_id}] FAISS indexing completed. Transitioning status to generating.")
+            current_job = load_job_state(job_id)
+            if current_job:
+                current_job["status"] = "generating"
+                save_job_state(job_id, current_job)
+
+        async def run_generating_task():
+            logger.info(f"[{job_id}] Started parallel LLM content generation task...")
+            content = await asyncio.to_thread(generate_podcast_analytics, segments)
+            logger.info(f"[{job_id}] LLM content generation completed.")
+            current_job = load_job_state(job_id)
+            if current_job:
+                current_job["content"] = content
+                save_job_state(job_id, current_job)
+
+        # Run both tasks concurrently
+        await asyncio.gather(run_indexing_task(), run_generating_task())
 
         # 5. DONE
         logger.info(f"[{job_id}] Ingestion pipeline completed successfully!")
+        job = load_job_state(job_id) or job
         job["status"] = "done"
         save_job_state(job_id, job)
 
     except (DownloadError, TranscriptionError, IndexingError, GenerationError) as pipeline_err:
         logger.error(f"[{job_id}] Ingestion failed with known error: {str(pipeline_err)}")
+        job = load_job_state(job_id) or job
         job["status"] = "error"
         job["error_message"] = str(pipeline_err)
         save_job_state(job_id, job)
     except Exception as e:
         logger.error(f"[{job_id}] Ingestion failed with unexpected error: {str(e)}")
+        job = load_job_state(job_id) or job
         job["status"] = "error"
         job["error_message"] = f"An unexpected error occurred during processing: {str(e)}"
         save_job_state(job_id, job)
