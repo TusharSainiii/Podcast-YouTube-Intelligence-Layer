@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle2, AlertTriangle, ArrowLeft, Play } from 'lucide-react';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function ProcessingPage() {
   const { jobId } = useParams();
@@ -84,6 +85,7 @@ export default function ProcessingPage() {
           </div>
           <span className="font-extrabold text-xl tracking-tight text-gradient">PodcastIQ</span>
         </div>
+        <ThemeToggle />
       </header>
 
       {/* Main progress stepper frame */}

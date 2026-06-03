@@ -6,6 +6,11 @@ import ProcessingPage from './pages/ProcessingPage';
 import ResultsPage from './pages/ResultsPage';
 
 export default function App() {
+  React.useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

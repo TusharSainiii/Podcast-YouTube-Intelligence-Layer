@@ -3,6 +3,32 @@
 
 /* Configure custom brand variables natively in Tailwind CSS v4 */
 @theme {
+  --color-theme-bg-primary: var(--color-theme-bg-primary);
+  --color-theme-bg-secondary: var(--color-theme-bg-secondary);
+  --color-theme-bg-tertiary: var(--color-theme-bg-tertiary);
+
+  --color-theme-border-muted: var(--color-theme-border-muted);
+  --color-theme-border-active: var(--color-theme-border-active);
+
+  --color-theme-accent-purple: var(--color-theme-accent-purple);
+  --color-theme-accent-purple-glow: var(--color-theme-accent-purple-glow);
+
+  --color-theme-text-primary: var(--color-theme-text-primary);
+  --color-theme-text-secondary: var(--color-theme-text-secondary);
+  --color-theme-text-disabled: var(--color-theme-text-disabled);
+
+  --color-theme-success: var(--color-theme-success);
+  --color-theme-error: var(--color-theme-error);
+  --color-theme-warning: var(--color-theme-warning);
+
+  --font-sans: 'Inter', sans-serif;
+
+  --shadow-glow: var(--shadow-glow);
+  --shadow-glow-strong: var(--shadow-glow-strong);
+}
+
+/* Variable roots for Dark theme (default) */
+:root {
   --color-theme-bg-primary: #0F0F0F;
   --color-theme-bg-secondary: #161616;
   --color-theme-bg-tertiary: #1E1E1E;
@@ -21,21 +47,48 @@
   --color-theme-error: #EF4444;
   --color-theme-warning: #F59E0B;
 
-  --font-sans: 'Inter', sans-serif;
-
   --shadow-glow: 0 0 15px rgba(108, 99, 255, 0.25);
   --shadow-glow-strong: 0 0 25px rgba(108, 99, 255, 0.4);
+  
+  --color-theme-glass-bg: rgba(22, 22, 22, 0.7);
+}
+
+/* Variable overrides for Light theme */
+html[data-theme="light"] {
+  --color-theme-bg-primary: #FAFAFA;
+  --color-theme-bg-secondary: #F3F4F6;
+  --color-theme-bg-tertiary: #E5E7EB;
+
+  --color-theme-border-muted: #E5E7EB;
+  --color-theme-border-active: #D1D5DB;
+
+  --color-theme-accent-purple: #564EE2;
+  --color-theme-accent-purple-glow: rgba(86, 78, 226, 0.08);
+
+  --color-theme-text-primary: #111827;
+  --color-theme-text-secondary: #4B5563;
+  --color-theme-text-disabled: #9CA3AF;
+
+  --color-theme-success: #16A34A;
+  --color-theme-error: #DC2626;
+  --color-theme-warning: #D97706;
+
+  --shadow-glow: 0 0 15px rgba(86, 78, 226, 0.15);
+  --shadow-glow-strong: 0 0 25px rgba(86, 78, 226, 0.25);
+  
+  --color-theme-glass-bg: rgba(255, 255, 255, 0.75);
 }
 
 /* Global body overrides */
 body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #0F0F0F;
-  color: #F5F5F5;
+  background-color: var(--color-theme-bg-primary);
+  color: var(--color-theme-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 /* Premium Scrollbars for Timeline & Workspace Views */
@@ -45,24 +98,25 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0F0F0F;
+  background: var(--color-theme-bg-primary);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #222222;
+  background: var(--color-theme-border-muted);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6C63FF;
+  background: var(--color-theme-accent-purple);
 }
 
 /* Custom visual utilities */
 .glass-panel {
-  background: rgba(22, 22, 22, 0.7);
+  background: var(--color-theme-glass-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-theme-border-muted);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .timestamp-chip {
@@ -76,8 +130,8 @@ body {
 
 /* Timeline highlight state transition */
 .timeline-segment-active {
-  border-left: 2px solid #6C63FF;
-  background: rgba(108, 99, 255, 0.05);
+  border-left: 2px solid var(--color-theme-accent-purple);
+  background: var(--color-theme-accent-purple-glow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -97,11 +151,12 @@ body {
 
 /* Text and Hero Radial Gradients */
 .text-gradient {
-  background: linear-gradient(135deg, #F5F5F5 30%, #888888 100%);
+  background: linear-gradient(135deg, var(--color-theme-text-primary) 30%, var(--color-theme-text-secondary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .hero-gradient {
-  background: radial-gradient(circle at top left, rgba(108, 99, 255, 0.15), transparent 60%);
+  background: radial-gradient(circle at top left, var(--color-theme-accent-purple-glow), transparent 60%);
+  transition: background 0.3s ease;
 }

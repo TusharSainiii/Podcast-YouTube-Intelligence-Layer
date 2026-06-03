@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Youtube, Upload, ArrowRight, Loader2, Play } from 'lucide-react';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function LandingPage() {
   const [activeTab, setActiveTab] = useState('youtube'); // 'youtube' | 'upload'
@@ -81,14 +82,17 @@ export default function LandingPage() {
           </div>
           <span className="font-extrabold text-xl tracking-tight text-gradient">PodcastIQ</span>
         </div>
-        <a 
-          href="https://github.com/TusharSainiii/Podcast-YouTube-Intelligence-Layer" 
-          target="_blank" 
-          rel="noreferrer"
-          className="text-sm font-medium text-theme-text-secondary hover:text-theme-text-primary transition-colors duration-200"
-        >
-          GitHub Repository
-        </a>
+        <div className="flex items-center space-x-4">
+          <a 
+            href="https://github.com/TusharSainiii/Podcast-YouTube-Intelligence-Layer" 
+            target="_blank" 
+            rel="noreferrer"
+            className="text-sm font-medium text-theme-text-secondary hover:text-theme-text-primary transition-colors duration-200"
+          >
+            GitHub Repository
+          </a>
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Hero Headline and Processing Box */}

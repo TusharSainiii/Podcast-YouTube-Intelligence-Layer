@@ -5,6 +5,7 @@ import { MessageSquare, FileText, Quote, Share2, Sparkles, Play, ArrowLeft, Load
 import Timeline from '../components/Timeline';
 import ChatUI from '../components/ChatUI';
 import GeneratedContent from '../components/GeneratedContent';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function ResultsPage() {
   const { podcastId } = useParams();
@@ -137,13 +138,16 @@ export default function ResultsPage() {
           </span>
         </div>
 
-        <button
-          onClick={() => navigate('/')}
-          className="inline-flex items-center space-x-1.5 text-xs text-theme-text-secondary hover:text-theme-text-primary transition-colors"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">New Podcast</span>
-        </button>
+        <div className="flex items-center space-x-4">
+          <ThemeToggle />
+          <button
+            onClick={() => navigate('/')}
+            className="inline-flex items-center space-x-1.5 text-xs text-theme-text-secondary hover:text-theme-text-primary transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">New Podcast</span>
+          </button>
+        </div>
       </header>
 
       {/* Main Split-Pane Workspace */}
