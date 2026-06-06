@@ -106,13 +106,19 @@ def query_podcast_index(podcast_id: str, question: str) -> Dict[str, Any]:
                 "sources": []
             }
             
-        # 3. Compile context and extract sources
+        # 3. Determine maximum context character budget to prevent rate limits (like Groq's 6,000 TPM limit)
+        max_context_chars = 8000 if settings.LLM_PROVIDER == "groq" else 50000
         context_str = ""
         
         # Inject pre-generated show notes for global summary/timeline queries
         if is_summary_request and show_notes:
             logger.info("Injecting pre-generated show notes/summaries into the RAG context.")
-            context_str += f"--- PRE-GENERATED PODCAST SHOW NOTES & SUMMARY ---\n{show_notes}\n\n"
+            # Budget check: if show notes are huge, truncate to 60% of budget
+            allowed_show_notes = show_notes
+            max_notes_chars = int(max_context_chars * 0.6)
+            if len(allowed_show_notes) > max_notes_chars:
+                allowed_show_notes = allowed_show_notes[:max_notes_chars] + "\n... [TRUNCATED] ..."
+            context_str += f"--- PRE-GENERATED PODCAST SHOW NOTES & SUMMARY ---\n{allowed_show_notes}\n\n"
             
         context_str += "--- DETAILED TRANSCRIBED SEGMENTS ---\n"
         sources = []
@@ -124,8 +130,14 @@ def query_podcast_index(podcast_id: str, question: str) -> Dict[str, Any]:
             timestamp_str = doc.metadata.get("timestamp_str", "00:00")
             content = doc.page_content.strip()
             
-            # Formulate full context blocks for LLM
-            context_str += f"[{timestamp_str}] {content}\n\n"
+            block = f"[{timestamp_str}] {content}\n\n"
+            
+            # If adding this chunk crosses our character budget, skip to prevent API failure
+            if len(context_str) + len(block) > max_context_chars:
+                logger.warning(f"Skipping document chunk at {timestamp_str} to fit within context budget of {max_context_chars} chars.")
+                continue
+                
+            context_str += block
             
             # Deduplicate sources based on start timestamp
             if timestamp_str not in seen_timestamps:
