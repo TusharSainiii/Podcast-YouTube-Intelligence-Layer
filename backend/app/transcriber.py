@@ -53,8 +53,14 @@ def _transcribe_locally(audio_path: str) -> List[Dict[str, Any]]:
         if _local_whisper_model is None:
             model_size = settings.WHISPER_LOCAL_MODEL
             logger.info(f"Loading local faster-whisper model: '{model_size}' (this may take a moment on first run)...")
-            # CTranslate2 runs 4x faster on CPU with compute_type="int8"
-            _local_whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8")
+            # CTranslate2 runs 4x faster on CPU with compute_type="int8", customized with cpu_threads & num_workers
+            _local_whisper_model = WhisperModel(
+                model_size, 
+                device="cpu", 
+                compute_type="int8", 
+                cpu_threads=4, 
+                num_workers=2
+            )
             logger.info("faster-whisper model loaded successfully.")
             
         logger.info(f"Transcribing '{audio_path}' locally using faster-whisper...")
@@ -133,13 +139,10 @@ def _transcribe_via_api(audio_path: str) -> List[Dict[str, Any]]:
             if not chunk_files:
                 raise TranscriptionError("Failed to generate chunk files using ffmpeg segment command.")
                 
-            combined_segments = []
+            # Compute offsets and durations of all chunk files chronologically first
+            chunk_infos = []
             current_offset = 0.0
-            
-            for i, chunk_path in enumerate(chunk_files):
-                logger.info(f"Transcribing chunk {i+1}/{len(chunk_files)}: {chunk_path} with offset {current_offset:.2f}s")
-                
-                # Get exact duration of this chunk
+            for chunk_path in chunk_files:
                 duration = 600.0
                 try:
                     duration_cmd = [
@@ -153,12 +156,21 @@ def _transcribe_via_api(audio_path: str) -> List[Dict[str, Any]]:
                 except Exception as e:
                     logger.warning(f"Could not get exact duration for {chunk_path}: {e}. Using 600.0s fallback.")
                 
-                # Send to API with a retry mechanism for connection/network glitches
+                chunk_infos.append((chunk_path, current_offset, duration))
+                current_offset += duration
+                
+            combined_segments = []
+            
+            # Helper function for single chunk parallel transcription
+            def transcribe_single_chunk(chunk_info):
+                chunk_path, offset, duration = chunk_info
+                logger.info(f"Transcribing chunk: {chunk_path} with offset {offset:.2f}s")
+                
                 transcript_response = None
                 max_retries = 3
                 for attempt in range(max_retries):
                     try:
-                        logger.info(f"Uploading chunk {i+1} (Attempt {attempt+1}/{max_retries})...")
+                        logger.info(f"Uploading chunk {chunk_path} (Attempt {attempt+1}/{max_retries})...")
                         with open(chunk_path, "rb") as audio_file:
                             transcript_response = client.audio.transcriptions.create(
                                 file=audio_file,
@@ -168,36 +180,47 @@ def _transcribe_via_api(audio_path: str) -> List[Dict[str, Any]]:
                         break  # Success!
                     except Exception as api_err:
                         if attempt == max_retries - 1:
-                            logger.error(f"Failed to transcribe chunk {i+1} after {max_retries} attempts: {api_err}")
+                            logger.error(f"Failed to transcribe chunk {chunk_path} after {max_retries} attempts: {api_err}")
                             raise api_err
                         logger.warning(f"Attempt {attempt+1} failed with error: {api_err}. Retrying in 3 seconds...")
                         time.sleep(3)
-                
+                        
                 response_dict = transcript_response.model_dump() if hasattr(transcript_response, "model_dump") else transcript_response
                 raw_segments = response_dict.get("segments", [])
                 
+                chunk_segments = []
                 if not raw_segments:
                     text = response_dict.get("text", "")
                     if text:
-                        combined_segments.append({
-                            "start": current_offset,
-                            "end": current_offset + duration,
+                        chunk_segments.append({
+                            "start": offset,
+                            "end": offset + duration,
                             "text": text.strip()
                         })
                 else:
                     for seg in raw_segments:
-                        combined_segments.append({
-                            "start": current_offset + float(seg.get("start", 0.0)),
-                            "end": current_offset + float(seg.get("end", 0.0)),
+                        chunk_segments.append({
+                            "start": offset + float(seg.get("start", 0.0)),
+                            "end": offset + float(seg.get("end", 0.0)),
                             "text": str(seg.get("text", "")).strip()
                         })
                 
                 try:
                     os.remove(chunk_path)
+                    logger.info(f"Deleted temporary chunk file: {chunk_path}")
                 except Exception as e:
                     logger.warning(f"Failed to delete temporary chunk file {chunk_path}: {e}")
                     
-                current_offset += duration
+                return chunk_segments
+
+            # Execute transcription requests concurrently in a thread pool
+            from concurrent.futures import ThreadPoolExecutor
+            logger.info(f"Dispatching transcription for {len(chunk_infos)} chunks in parallel...")
+            with ThreadPoolExecutor(max_workers=min(len(chunk_infos), 10)) as executor:
+                results = executor.map(transcribe_single_chunk, chunk_infos)
+                
+            for chunk_segments in results:
+                combined_segments.extend(chunk_segments)
                 
             logger.info(f"API transcription of all chunks complete. Generated {len(combined_segments)} total segments.")
             return combined_segments

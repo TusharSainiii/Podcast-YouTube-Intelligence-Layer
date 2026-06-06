@@ -181,61 +181,98 @@ export default function GeneratedContent({ showNotes, keyQuotes, socialPosts, on
           <div className="space-y-6 animate-fade-in">
             
             {/* Row 1: Twitter Thread */}
-            <div className="space-y-2.5 bg-theme-bg-primary/20 border border-theme-border-muted p-5 rounded-2xl">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                  <Twitter className="w-4 h-4 text-sky-400" />
-                  <span className="text-xs font-bold text-theme-text-primary">Twitter (X) thread</span>
+            <div className="space-y-3 bg-theme-bg-secondary border border-theme-border-muted p-5 rounded-2xl shadow-sm">
+              <div className="flex justify-between items-center pb-2 border-b border-theme-border-muted">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-full bg-sky-500/10 flex items-center justify-center border border-sky-500/20 shrink-0">
+                    <Twitter className="w-4 h-4 text-sky-400 fill-sky-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs font-bold text-theme-text-primary">PodcastIQ X Thread</span>
+                      <span className="w-3.5 h-3.5 rounded-full bg-sky-500 flex items-center justify-center text-[8px] font-bold text-white shrink-0" title="Verified Creator">✓</span>
+                    </div>
+                    <span className="text-[10px] text-theme-text-disabled">@podcastiq &bull; Auto Thread Draft</span>
+                  </div>
                 </div>
                 <button
                   onClick={() => handleCopyToClipboard(socialPosts.twitter, 'tw')}
-                  className="text-[10px] font-bold text-theme-accent-purple flex items-center space-x-1 hover:text-theme-text-primary"
+                  className="text-[10px] font-bold text-theme-accent-purple bg-theme-accent-purple/10 border border-theme-accent-purple/20 px-2.5 py-1 rounded-lg hover:bg-theme-accent-purple/20 transition-all duration-200 cursor-pointer flex items-center space-x-1"
                 >
                   {copiedStates['tw'] ? <Check className="w-3 h-3 text-theme-success" /> : <Copy className="w-3 h-3" />}
                   <span>{copiedStates['tw'] ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
-              <div className="bg-theme-bg-secondary p-4 rounded-xl border border-theme-border-muted text-xs text-theme-text-secondary whitespace-pre-wrap font-mono leading-relaxed">
+              <div className="bg-theme-bg-primary/50 p-4 rounded-xl border border-theme-border-muted text-xs text-theme-text-secondary whitespace-pre-wrap font-mono leading-relaxed">
                 {socialPosts.twitter || 'Twitter post not configured.'}
+              </div>
+              
+              {/* Tweet Metrics Mock Panel */}
+              <div className="flex items-center justify-start gap-6 pt-2 text-[10px] text-theme-text-disabled border-t border-theme-border-muted/50 select-none">
+                <span>💬 12 replies</span>
+                <span>🔁 48 reposts</span>
+                <span>❤️ 294 likes</span>
               </div>
             </div>
 
             {/* Row 2: LinkedIn Narrative */}
-            <div className="space-y-2.5 bg-theme-bg-primary/20 border border-theme-border-muted p-5 rounded-2xl">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                  <Linkedin className="w-4 h-4 text-blue-500" />
-                  <span className="text-xs font-bold text-theme-text-primary">LinkedIn Narrative</span>
+            <div className="space-y-3 bg-theme-bg-secondary border border-theme-border-muted p-5 rounded-2xl shadow-sm">
+              <div className="flex justify-between items-center pb-2 border-b border-theme-border-muted">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shrink-0">
+                    <Linkedin className="w-4 h-4 text-blue-500 fill-blue-500" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs font-bold text-theme-text-primary">PodcastIQ Curator</span>
+                      <span className="text-[9px] bg-theme-bg-tertiary px-1 rounded text-theme-text-disabled">In</span>
+                    </div>
+                    <span className="text-[10px] text-theme-text-disabled">Executive Insights Creator &bull; 1h &bull; 🌐</span>
+                  </div>
                 </div>
                 <button
                   onClick={() => handleCopyToClipboard(socialPosts.linkedin, 'li')}
-                  className="text-[10px] font-bold text-theme-accent-purple flex items-center space-x-1 hover:text-theme-text-primary"
+                  className="text-[10px] font-bold text-theme-accent-purple bg-theme-accent-purple/10 border border-theme-accent-purple/20 px-2.5 py-1 rounded-lg hover:bg-theme-accent-purple/20 transition-all duration-200 cursor-pointer flex items-center space-x-1"
                 >
                   {copiedStates['li'] ? <Check className="w-3 h-3 text-theme-success" /> : <Copy className="w-3 h-3" />}
                   <span>{copiedStates['li'] ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
-              <div className="bg-theme-bg-secondary p-4 rounded-xl border border-theme-border-muted text-xs text-theme-text-secondary whitespace-pre-wrap leading-relaxed">
+              <div className="bg-theme-bg-primary/50 p-4 rounded-xl border border-theme-border-muted text-xs text-theme-text-secondary whitespace-pre-wrap leading-relaxed">
                 {socialPosts.linkedin || 'LinkedIn post not configured.'}
+              </div>
+
+              {/* LinkedIn Reaction Metrics Mock Panel */}
+              <div className="flex items-center justify-between pt-2 border-t border-theme-border-muted/50 text-[10px] text-theme-text-disabled select-none">
+                <div className="flex items-center space-x-1">
+                  <span>👍❤️💡</span>
+                  <span>142 reactions</span>
+                </div>
+                <span>12 comments &bull; 4 reposts</span>
               </div>
             </div>
 
-            {/* Row 3: Instagram Hook Kit */}
-            <div className="space-y-2.5 bg-theme-bg-primary/20 border border-theme-border-muted p-5 rounded-2xl">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                  <Instagram className="w-4 h-4 text-pink-500" />
-                  <span className="text-xs font-bold text-theme-text-primary">Instagram Copy & Hashtags</span>
+            {/* Row 3: Instagram Copy */}
+            <div className="space-y-3 bg-theme-bg-secondary border border-theme-border-muted p-5 rounded-2xl shadow-sm">
+              <div className="flex justify-between items-center pb-2 border-b border-theme-border-muted">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-full bg-pink-500/10 flex items-center justify-center border border-pink-500/20 shrink-0">
+                    <Instagram className="w-4 h-4 text-pink-500" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-theme-text-primary block">podcastiq_shorts</span>
+                    <span className="text-[10px] text-theme-text-disabled">Visual Hook & Reels Copy</span>
+                  </div>
                 </div>
                 <button
                   onClick={() => handleCopyToClipboard(socialPosts.instagram, 'ig')}
-                  className="text-[10px] font-bold text-theme-accent-purple flex items-center space-x-1 hover:text-theme-text-primary"
+                  className="text-[10px] font-bold text-theme-accent-purple bg-theme-accent-purple/10 border border-theme-accent-purple/20 px-2.5 py-1 rounded-lg hover:bg-theme-accent-purple/20 transition-all duration-200 cursor-pointer flex items-center space-x-1"
                 >
                   {copiedStates['ig'] ? <Check className="w-3 h-3 text-theme-success" /> : <Copy className="w-3 h-3" />}
                   <span>{copiedStates['ig'] ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
-              <div className="bg-theme-bg-secondary p-4 rounded-xl border border-theme-border-muted text-xs text-theme-text-secondary whitespace-pre-wrap leading-relaxed">
+              <div className="bg-theme-bg-primary/50 p-4 rounded-xl border border-theme-border-muted text-xs text-theme-text-secondary whitespace-pre-wrap leading-relaxed">
                 {socialPosts.instagram || 'Instagram post not configured.'}
               </div>
             </div>

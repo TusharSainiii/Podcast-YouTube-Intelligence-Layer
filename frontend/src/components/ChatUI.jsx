@@ -65,6 +65,16 @@ export default function ChatUI({ podcastId, onCitationClick }) {
     }
   };
 
+  const handleSuggestionClick = (suggestionText) => {
+    setInputText(suggestionText);
+    setTimeout(() => {
+      const submitBtn = document.getElementById('chat-submit-btn');
+      if (submitBtn) {
+        submitBtn.click();
+      }
+    }, 50);
+  };
+
   return (
     <div className="flex flex-col h-full bg-theme-bg-secondary/40 backdrop-blur-md rounded-2xl border border-theme-border-muted overflow-hidden">
       
@@ -142,6 +152,33 @@ export default function ChatUI({ podcastId, onCitationClick }) {
         <div ref={threadEndRef} />
       </div>
 
+      {/* Quick Suggestion Chips - shown only when thread is new */}
+      {messages.length === 1 && (
+        <div className="px-6 py-2.5 bg-theme-bg-secondary/40 border-t border-theme-border-muted flex flex-wrap gap-2 animate-fade-in shrink-0">
+          <span className="text-[9px] font-bold text-theme-text-disabled uppercase tracking-wider self-center mr-1">
+            Suggestions:
+          </span>
+          <button
+            onClick={() => handleSuggestionClick("Summarize the main points discussed in this episode.")}
+            className="text-[10px] bg-theme-accent-purple/10 hover:bg-theme-accent-purple/20 text-theme-accent-purple border border-theme-accent-purple/20 px-2.5 py-1 rounded-lg transition-all duration-200 cursor-pointer hover:-translate-y-[1px] active:scale-95"
+          >
+            📝 Summarize Episode
+          </button>
+          <button
+            onClick={() => handleSuggestionClick("What are the key quotes or highlights from this segment?")}
+            className="text-[10px] bg-theme-accent-purple/10 hover:bg-theme-accent-purple/20 text-theme-accent-purple border border-theme-accent-purple/20 px-2.5 py-1 rounded-lg transition-all duration-200 cursor-pointer hover:-translate-y-[1px] active:scale-95"
+          >
+            🎙️ Key Highlights
+          </button>
+          <button
+            onClick={() => handleSuggestionClick("Provide a bulleted list of main takeaways.")}
+            className="text-[10px] bg-theme-accent-purple/10 hover:bg-theme-accent-purple/20 text-theme-accent-purple border border-theme-accent-purple/20 px-2.5 py-1 rounded-lg transition-all duration-200 cursor-pointer hover:-translate-y-[1px] active:scale-95"
+          >
+            ✅ Takeaways checklist
+          </button>
+        </div>
+      )}
+
       {/* Message Ingestion Form Bar */}
       <form onSubmit={handleSend} className="p-4 border-t border-theme-border-muted bg-theme-bg-secondary/80">
         <div className="relative flex items-center">
@@ -155,8 +192,9 @@ export default function ChatUI({ podcastId, onCitationClick }) {
           />
           <button
             type="submit"
+            id="chat-submit-btn"
             disabled={!inputText.trim() || isLoading}
-            className="absolute right-2 p-2.5 rounded-lg bg-theme-accent-purple hover:bg-theme-accent-purple/90 active:scale-95 disabled:bg-theme-bg-tertiary disabled:text-theme-text-disabled text-white shadow-glow transition-all duration-200 flex items-center justify-center"
+            className="absolute right-2 p-2.5 rounded-lg bg-theme-accent-purple hover:bg-theme-accent-purple/90 active:scale-95 disabled:bg-theme-bg-tertiary disabled:text-theme-text-disabled text-white shadow-glow transition-all duration-200 flex items-center justify-center cursor-pointer"
           >
             <Send className="w-3.5 h-3.5" />
           </button>

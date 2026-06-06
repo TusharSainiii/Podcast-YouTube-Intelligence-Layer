@@ -160,3 +160,57 @@ body {
   background: radial-gradient(circle at top left, var(--color-theme-accent-purple-glow), transparent 60%);
   transition: background 0.3s ease;
 }
+
+/* High-End Visual Effects & Micro-Animations */
+
+@keyframes radar-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(108, 99, 255, 0.4);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 20px rgba(108, 99, 255, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(108, 99, 255, 0);
+    opacity: 0.8;
+  }
+}
+
+.animate-radar-pulse {
+  animation: radar-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(108, 99, 255, 0.1);
+    border-color: var(--color-theme-border-muted);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(108, 99, 255, 0.25);
+    border-color: var(--color-theme-accent-purple);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 4s ease-in-out infinite;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

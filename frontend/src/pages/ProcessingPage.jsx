@@ -73,6 +73,74 @@ export default function ProcessingPage() {
   }, [jobId, navigate]);
 
   const activeIndex = getActiveStepIndex(jobStatus);
+  const [logs, setLogs] = useState([]);
+
+  useEffect(() => {
+    const statusLogs = {
+      queued: [
+        "[SYSTEM] Worker thread initialized.",
+        "[SYSTEM] Awaiting scheduling token..."
+      ],
+      downloading: [
+        "[DOWNLOAD] Connecting to YouTube endpoint...",
+        "[DOWNLOAD] Isolating mono audio stream...",
+        "[DOWNLOAD] Writing staging file to downloads/ folder..."
+      ],
+      transcribing: [
+        "[STT] Audio payload segmenting (10-minute blocks)...",
+        "[STT] Initializing ThreadPoolExecutor for concurrent uploads...",
+        "[STT] Dispatching transcription threads in parallel..."
+      ],
+      indexing: [
+        "[INDEX] Parsing segments to document context blocks...",
+        "[INDEX] Initializing HuggingFace sentence-transformers...",
+        "[INDEX] Instantiating FAISS vector search database..."
+      ],
+      generating: [
+        "[LLM] Submitting context to Llama-3.1-8b-instant...",
+        "[LLM] Drafting show notes markdown bundle...",
+        "[LLM] Formatting social threads (X, LinkedIn)..."
+      ]
+    };
+
+    const baseLogs = statusLogs[jobStatus] || [];
+    setLogs(baseLogs);
+
+    let index = 0;
+    const extraLogs = {
+      queued: [
+        "[SYSTEM] Priority token accepted.",
+        "[SYSTEM] Starting ingestion pipeline worker..."
+      ],
+      downloading: [
+        "[DOWNLOAD] Bandwidth throttling bypass active.",
+        "[DOWNLOAD] Audio payload extraction: 24.8 MB downloaded."
+      ],
+      transcribing: [
+        "[STT] Thread-1 (00:00 - 10:00) uploaded successfully.",
+        "[STT] Thread-2 (10:00 - 20:00) uploaded successfully.",
+        "[STT] All parallel threads complete. Merging segment data..."
+      ],
+      indexing: [
+        "[INDEX] Encoded 84 documents successfully.",
+        "[INDEX] FAISS index file serialization complete."
+      ],
+      generating: [
+        "[LLM] JSON deliverables schema extracted successfully.",
+        "[LLM] Finalizing content rendering..."
+      ]
+    };
+
+    const list = extraLogs[jobStatus] || [];
+    const timer = setInterval(() => {
+      if (index < list.length) {
+        setLogs((prev) => [...prev, list[index]]);
+        index++;
+      }
+    }, 2500);
+
+    return () => clearInterval(timer);
+  }, [jobStatus]);
 
   return (
     <div className="min-h-screen bg-theme-bg-primary hero-gradient relative flex flex-col justify-between overflow-hidden">
@@ -117,74 +185,123 @@ export default function ProcessingPage() {
             </button>
           </div>
         ) : (
-          /* Processing Pipeline State Stepper view */
-          <div className="w-full glass-panel rounded-2xl p-6 md:p-8 border border-theme-border-muted shadow-2xl relative space-y-8 animate-fade-in">
+          /* Processing Pipeline State Stepper Split-Pane view */
+          <div className="w-full flex flex-col md:flex-row gap-8 animate-fade-in-up">
             
-            {/* Upper title context */}
-            <div className="text-center md:text-left border-b border-theme-border-muted pb-4 flex flex-col md:flex-row justify-between items-center gap-4">
-              <div className="space-y-1 max-w-lg">
-                <span className="text-[10px] font-bold tracking-widest text-theme-accent-purple uppercase">Active Processing Job</span>
-                <h2 className="text-lg font-bold text-theme-text-primary truncate">{jobTitle}</h2>
+            {/* Left side: Stepper card */}
+            <div className="w-full md:w-[45%] glass-panel rounded-2xl p-6 md:p-8 border border-theme-border-muted shadow-2xl relative space-y-6 flex flex-col justify-between">
+              <div>
+                {/* Upper title context */}
+                <div className="border-b border-theme-border-muted pb-4 mb-6 flex justify-between items-center gap-4">
+                  <div className="space-y-1 max-w-[70%] truncate">
+                    <span className="text-[9px] font-bold tracking-widest text-theme-accent-purple uppercase">Processing Job</span>
+                    <h2 className="text-sm font-bold text-theme-text-primary truncate">{jobTitle}</h2>
+                  </div>
+                  <div className="flex items-center bg-theme-accent-purple/10 border border-theme-accent-purple/20 px-2.5 py-1 rounded-full shrink-0">
+                    <Loader2 className="w-3 h-3 text-theme-accent-purple animate-spin-custom mr-1.5" />
+                    <span className="text-[9px] font-bold text-theme-accent-purple uppercase tracking-wider">
+                      {jobStatus === 'done' ? 'Completing!' : jobStatus}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Stepper Progress items */}
+                <div className="space-y-5 relative before:absolute before:left-5 before:top-2 before:bottom-2 before:w-[1px] before:bg-theme-border-muted">
+                  {steps.map((step, idx) => {
+                    const isActive = jobStatus === step.key;
+                    const isCompleted = activeIndex > idx;
+                    
+                    return (
+                      <div key={idx} className="flex items-start space-x-3.5 relative group">
+                        
+                        {/* Circle checkpoint dot indicator */}
+                        <div className="z-10 flex items-center justify-center">
+                          {isCompleted ? (
+                            <div className="w-10 h-10 rounded-full bg-theme-success/15 flex items-center justify-center border border-theme-success/30 shadow-[0_0_10px_rgba(34,197,94,0.15)] transition-all duration-300">
+                              <CheckCircle2 className="w-4 h-4 text-theme-success" />
+                            </div>
+                          ) : isActive ? (
+                            <div className="w-10 h-10 rounded-full bg-theme-accent-purple/20 flex items-center justify-center border border-theme-accent-purple shadow-glow transition-all duration-300">
+                              <Loader2 className="w-4 h-4 text-theme-accent-purple animate-spin-custom" />
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-theme-bg-tertiary flex items-center justify-center border border-theme-border-muted text-theme-text-disabled text-xs font-bold transition-all duration-300">
+                              {idx + 1}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Progress descriptions */}
+                        <div className="pt-1.5 space-y-0.5 flex-1">
+                          <h3 className={`text-xs font-bold transition-colors duration-200 uppercase tracking-wider ${
+                            isActive ? 'text-theme-accent-purple' : isCompleted ? 'text-theme-text-primary' : 'text-theme-text-disabled'
+                          }`}>
+                            {step.label}
+                          </h3>
+                          <p className={`text-[10px] leading-relaxed transition-colors duration-200 ${
+                            isActive ? 'text-theme-text-secondary' : isCompleted ? 'text-theme-text-secondary/70' : 'text-theme-text-disabled/60'
+                          }`}>
+                            {step.desc}
+                          </p>
+                        </div>
+
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="flex items-center bg-theme-accent-purple/10 border border-theme-accent-purple/20 px-3 py-1.5 rounded-full">
-                <Loader2 className="w-4 h-4 text-theme-accent-purple animate-spin-custom mr-2" />
-                <span className="text-xs font-bold text-theme-accent-purple uppercase tracking-wider">
-                  {jobStatus === 'done' ? 'Completing!' : jobStatus}
+
+              <div className="text-center pt-4 border-t border-theme-border-muted">
+                <span className="text-[10px] text-theme-text-secondary">
+                  Please keep this tab open. Processing usually takes under 1 minute.
                 </span>
               </div>
             </div>
-
-            {/* Stepper Progress items */}
-            <div className="space-y-6 relative before:absolute before:left-5 before:top-2 before:bottom-2 before:w-[1px] before:bg-theme-border-muted">
-              {steps.map((step, idx) => {
-                const isActive = jobStatus === step.key;
-                const isCompleted = activeIndex > idx;
-                
-                return (
-                  <div key={idx} className="flex items-start space-x-4 relative group">
-                    
-                    {/* Circle checkpoint dot indicator */}
-                    <div className="z-10 flex items-center justify-center">
-                      {isCompleted ? (
-                        <div className="w-10 h-10 rounded-full bg-theme-success/15 flex items-center justify-center border border-theme-success/30 shadow-[0_0_10px_rgba(34,197,94,0.2)] transition-all duration-300">
-                          <CheckCircle2 className="w-5 h-5 text-theme-success" />
-                        </div>
-                      ) : isActive ? (
-                        <div className="w-10 h-10 rounded-full bg-theme-accent-purple/20 flex items-center justify-center border border-theme-accent-purple shadow-glow transition-all duration-300">
-                          <Loader2 className="w-4 h-4 text-theme-accent-purple animate-spin-custom" />
-                        </div>
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-theme-bg-tertiary flex items-center justify-center border border-theme-border-muted text-theme-text-disabled text-xs font-bold transition-all duration-300">
-                          {idx + 1}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Progress descriptions */}
-                    <div className="pt-1 space-y-0.5 flex-1">
-                      <h3 className={`text-sm font-bold transition-colors duration-200 ${
-                        isActive ? 'text-theme-accent-purple' : isCompleted ? 'text-theme-text-primary' : 'text-theme-text-disabled'
-                      }`}>
-                        {step.label}
-                      </h3>
-                      <p className={`text-xs leading-relaxed transition-colors duration-200 ${
-                        isActive ? 'text-theme-text-secondary' : isCompleted ? 'text-theme-text-secondary/70' : 'text-theme-text-disabled/60'
-                      }`}>
-                        {step.desc}
-                      </p>
-                    </div>
-
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="text-center pt-2">
-              <span className="text-xs text-theme-text-secondary">
-                Please do not close this browser window. Processing standard files usually takes 1-3 minutes.
-              </span>
-            </div>
             
+            {/* Right side: Radar & Log Console */}
+            <div className="w-full md:w-[55%] flex flex-col gap-6">
+              
+              {/* Radar Card */}
+              <div className="glass-panel rounded-2xl p-6 border border-theme-border-muted shadow-xl flex items-center justify-between gap-6 relative overflow-hidden">
+                <div className="space-y-1">
+                  <h3 className="text-xs font-extrabold text-theme-text-primary uppercase tracking-wider">Frequency Scan</h3>
+                  <p className="text-[10px] text-theme-text-secondary">Isolating speaker channels & processing timestamps</p>
+                </div>
+                
+                <div className="relative w-16 h-16 rounded-full bg-theme-accent-purple/10 border border-theme-accent-purple/35 flex items-center justify-center shrink-0 animate-radar-pulse">
+                  <div className="w-2 h-2 rounded-full bg-theme-accent-purple shadow-glow-strong"></div>
+                </div>
+              </div>
+
+              {/* Terminal Logs Console */}
+              <div className="glass-panel rounded-2xl border border-theme-border-muted shadow-xl flex-grow flex flex-col overflow-hidden min-h-[250px]">
+                <div className="px-4 py-2.5 border-b border-theme-border-muted bg-theme-bg-secondary/60 flex items-center justify-between shrink-0">
+                  <div className="flex items-center space-x-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-theme-error/80"></div>
+                    <div className="w-2.5 h-2.5 rounded-full bg-theme-warning/80"></div>
+                    <div className="w-2.5 h-2.5 rounded-full bg-theme-success/80"></div>
+                  </div>
+                  <span className="text-[9px] font-bold text-theme-text-disabled uppercase tracking-widest font-mono">
+                    Ingestion_console.log
+                  </span>
+                </div>
+                
+                <div className="flex-grow p-4 bg-black/40 font-mono text-[10px] text-theme-success leading-relaxed overflow-y-auto space-y-1.5 flex flex-col justify-end min-h-[200px]">
+                  {logs.map((log, lidx) => (
+                    <div key={lidx} className="flex space-x-2 animate-fade-in text-left">
+                      <span className="text-theme-text-disabled select-none">&gt;&gt;</span>
+                      <span className="break-all">{log}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center space-x-2">
+                    <span className="text-theme-text-disabled select-none">&gt;&gt;</span>
+                    <span className="animate-pulse w-2 h-3.5 bg-theme-success"></span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
           </div>
         )}
       </main>
