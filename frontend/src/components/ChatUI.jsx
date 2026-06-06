@@ -1,23 +1,68 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, MessageSquare, Loader2, Sparkles, Clock } from 'lucide-react';
+import { Send, MessageSquare, Loader2, Sparkles, Clock, Trash2 } from 'lucide-react';
 
 export default function ChatUI({ podcastId, onCitationClick }) {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      text: "Hello! I am your PodcastIQ Assistant. I have indexed the entire transcript of this episode. Ask me anything, for example: 'What did the guest say about seed funding?' or 'Summarize the final takeaways.'",
-      sources: []
+  const defaultGreeting = {
+    role: 'assistant',
+    text: "Hello! I am your PodcastIQ Assistant. I have indexed the entire transcript of this episode. Ask me anything, for example: 'What did the guest say about seed funding?' or 'Summarize the final takeaways.'",
+    sources: []
+  };
+
+  const [messages, setMessages] = useState(() => {
+    try {
+      const persisted = localStorage.getItem(`podcastiq_chat_${podcastId}`);
+      if (persisted) {
+        return JSON.parse(persisted);
+      }
+    } catch (err) {
+      console.error("Failed to parse persisted chat history:", err);
     }
-  ]);
+    return [defaultGreeting];
+  });
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
   const threadEndRef = useRef(null);
 
+  // Sync state if podcastId changes
+  useEffect(() => {
+    try {
+      const persisted = localStorage.getItem(`podcastiq_chat_${podcastId}`);
+      if (persisted) {
+        setMessages(JSON.parse(persisted));
+      } else {
+        setMessages([defaultGreeting]);
+      }
+    } catch (err) {
+      console.error("Failed to load persisted chat history:", err);
+      setMessages([defaultGreeting]);
+    }
+  }, [podcastId]);
+
+  // Persist chat to local storage whenever it changes
+  useEffect(() => {
+    try {
+      if (messages.length > 0) {
+        localStorage.setItem(`podcastiq_chat_${podcastId}`, JSON.stringify(messages));
+      }
+    } catch (err) {
+      console.error("Failed to persist chat history:", err);
+    }
+  }, [messages, podcastId]);
+
   // Auto-scroll to bottom of chat thread on new messages
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  const handleClearChat = () => {
+    try {
+      localStorage.removeItem(`podcastiq_chat_${podcastId}`);
+      setMessages([defaultGreeting]);
+    } catch (err) {
+      console.error("Failed to clear chat history:", err);
+    }
+  };
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -84,7 +129,19 @@ export default function ChatUI({ podcastId, onCitationClick }) {
           <Sparkles className="w-4 h-4 text-theme-accent-purple" />
           <h3 className="font-extrabold text-sm text-theme-text-primary uppercase tracking-wider">AI Podcast Assistant</h3>
         </div>
-        <span className="text-[10px] uppercase font-bold text-theme-text-disabled">RAG Index Engine Active</span>
+        <div className="flex items-center space-x-3">
+          {messages.length > 1 && (
+            <button
+              onClick={handleClearChat}
+              type="button"
+              title="Clear chat history"
+              className="p-1 rounded hover:bg-theme-bg-tertiary text-theme-text-secondary hover:text-red-500 transition-colors cursor-pointer flex items-center justify-center"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <span className="text-[10px] uppercase font-bold text-theme-text-disabled">RAG Index Engine Active</span>
+        </div>
       </div>
 
       {/* Messages Thread Feed */}
