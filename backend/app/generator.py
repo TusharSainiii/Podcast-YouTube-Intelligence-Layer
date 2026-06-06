@@ -133,18 +133,17 @@ def generate_podcast_analytics(segments: List[Dict[str, Any]]) -> Dict[str, Any]
         response = llm.invoke(messages)
         raw_output = response.content.strip()
         
-        # Clean markdown wrappers if any were generated (e.g. ```json ... ```)
-        if raw_output.startswith("```"):
-            lines = raw_output.split("\n")
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines[-1].startswith("```"):
-                lines = lines[:-1]
-            raw_output = "\n".join(lines).strip()
+        # Robust JSON Extraction: Find the bounds of the outer JSON object
+        json_content = raw_output
+        start_idx = raw_output.find('{')
+        end_idx = raw_output.rfind('}')
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            json_content = raw_output[start_idx:end_idx+1]
+            logger.info("Extracted JSON candidate substring successfully from raw LLM output.")
             
         # Parse the compiled JSON deliverables
         try:
-            deliverables = json.loads(raw_output)
+            deliverables = json.loads(json_content)
             logger.info("Content synthesis and JSON extraction complete.")
             return {
                 "show_notes": deliverables.get("show_notes", ""),
@@ -152,7 +151,7 @@ def generate_podcast_analytics(segments: List[Dict[str, Any]]) -> Dict[str, Any]
                 "social_posts": deliverables.get("social_posts", {})
             }
         except json.JSONDecodeError as jde:
-            logger.error(f"Failed to parse LLM JSON deliverables. Output was:\n{raw_output}")
+            logger.error(f"Failed to parse LLM JSON deliverables. Raw output was:\n{raw_output}")
             # Fallback parsing/wrapping in case LLM outputs plain text or broken JSON
             return _generate_fallback_deliverables(raw_output)
             
