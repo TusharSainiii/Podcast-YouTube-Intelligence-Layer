@@ -66,6 +66,7 @@ def query_podcast_index(podcast_id: str, question: str) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: Contains 'answer' and 'sources' list.
     """
+    import json
     index_path = os.path.join(settings.INDEXES_DIR, podcast_id)
     if not os.path.exists(index_path):
         raise RAGError(
@@ -79,12 +80,27 @@ def query_podcast_index(podcast_id: str, question: str) -> Dict[str, Any]:
         logger.info(f"Loading local FAISS vector store from: {index_path}...")
         vector_store = FAISS.load_local(index_path, embeddings, allow_dangerous_deserialization=True)
         
-        # 2. Retrieve top matching segments
-        logger.info(f"Retrieving top documents for query: '{question}'...")
-        docs = vector_store.similarity_search(question, k=4)
+        # 2. Check for summary/overview intent and retrieve job data
+        summary_keywords = ["summary", "summarize", "takeaways", "highlights", "overview", "outline", "full podcast", "whole podcast", "details", "points", "सारांश", "संक्षेप", "निष्कर्ष", "पॉइंट"]
+        is_summary_request = any(kw in question.lower() for kw in summary_keywords)
+        
+        show_notes = ""
+        job_file = os.path.join(settings.DATA_DIR, f"{podcast_id}.json")
+        if os.path.exists(job_file):
+            try:
+                with open(job_file, "r", encoding="utf-8") as f:
+                    job_data = json.load(f)
+                    show_notes = job_data.get("content", {}).get("show_notes", "")
+            except Exception as e:
+                logger.warning(f"Could not load job data for RAG query: {e}")
+
+        # Retrieve top matching segments - increase k from 4 to 12/8 for much more context detail
+        k_val = 12 if is_summary_request else 8
+        logger.info(f"Retrieving top {k_val} documents for query: '{question}'...")
+        docs = vector_store.similarity_search(question, k=k_val)
         logger.info(f"Retrieved {len(docs)} matching documents.")
         
-        if not docs:
+        if not docs and not show_notes:
             return {
                 "answer": "I couldn't find any relevant discussion regarding that topic in this podcast episode.",
                 "sources": []
@@ -92,6 +108,13 @@ def query_podcast_index(podcast_id: str, question: str) -> Dict[str, Any]:
             
         # 3. Compile context and extract sources
         context_str = ""
+        
+        # Inject pre-generated show notes for global summary/timeline queries
+        if is_summary_request and show_notes:
+            logger.info("Injecting pre-generated show notes/summaries into the RAG context.")
+            context_str += f"--- PRE-GENERATED PODCAST SHOW NOTES & SUMMARY ---\n{show_notes}\n\n"
+            
+        context_str += "--- DETAILED TRANSCRIBED SEGMENTS ---\n"
         sources = []
         seen_timestamps = set()
         
@@ -122,11 +145,12 @@ def query_podcast_index(podcast_id: str, question: str) -> Dict[str, Any]:
         
         system_prompt = (
             "You are a helpful, precise podcast intelligence assistant named PodcastIQ.\n"
-            "You are provided with several transcribed segments of a podcast interview, labeled with their start timestamps.\n"
-            "Your task is to answer the user's question about the podcast relying ONLY on the provided context.\n\n"
+            "You are provided with transcribed segments of a podcast interview, labeled with their start timestamps, "
+            "and potentially pre-generated show notes/summaries.\n"
+            "Your task is to answer the user's question about the podcast relying strictly on the provided context.\n\n"
             "Rules:\n"
-            "1. Ground your answer strictly in the provided context transcripts. Do NOT make up facts or use outside knowledge.\n"
-            "2. Be concise, clear, and direct.\n"
+            "1. Ground your answer strictly in the provided context. Do NOT make up facts or use outside knowledge.\n"
+            "2. Be comprehensive, detailed, and clear. Do not truncate summaries or explanations; provide complete and thorough answers that fully address the user's prompt, especially if they ask for a summary, outline, or key points.\n"
             "3. If the context does not contain enough information to answer the question, state that you cannot answer based on the transcript.\n"
             "4. When referencing an insight or topic, please explicitly use the timestamp brackets like [MM:SS] or [HH:MM:SS] in your sentences "
             "so the user knows exactly when it was discussed.\n\n"
